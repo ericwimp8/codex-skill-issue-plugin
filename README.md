@@ -28,14 +28,15 @@ This repository owns the plugin content. The
 [Skill Issue](https://github.com/ericwimp8/skill-issue) CLI includes the same
 skills through a Git submodule pinned to an exact commit of this repository.
 
-Pushing `main` runs `.github/workflows/update-skill-issue.yml`. That workflow
-updates the Skill Issue dependency pointer, validates the CLI, and pushes a
-dedicated automation branch. A workflow in Skill Issue opens the corresponding
-pull request for review.
+After publishing `main`, the publishing agent triggers Skill Issue's
+`sync-skill-issue-plugin.yml` workflow through GitHub CLI. The workflow updates
+the pinned dependency to this repository's latest `main` commit, validates the
+CLI, and pushes a commit-specific automation branch. The agent then opens and
+merges the Skill Issue pull request through its authenticated GitHub CLI
+session.
 
 Do not edit plugin files from the Skill Issue submodule checkout. Make the
-change here, validate it, push it, and allow the dependency-update pull request
-to carry the exact commit into the CLI.
+change here, validate it, push it, and trigger the dependency sync.
 
 ## License
 
