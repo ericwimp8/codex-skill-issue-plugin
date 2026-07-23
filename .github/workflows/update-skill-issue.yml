@@ -1,0 +1,60 @@
+name: Update Skill Issue dependency
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: update-skill-issue-dependency
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update Skill Issue submodule pointer
+        env:
+          DEPLOY_KEY: ${{ secrets.SKILL_ISSUE_DEPLOY_KEY }}
+          PLUGIN_SHA: ${{ github.sha }}
+        run: |
+          test -n "$DEPLOY_KEY"
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/skill-issue-deploy-key
+          chmod 600 ~/.ssh/skill-issue-deploy-key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/skill-issue-deploy-key -o IdentitiesOnly=yes"
+          git clone git@github.com:ericwimp8/skill-issue.git skill-issue
+
+          dependency=dependencies/codex-skill-issue-plugin
+          if ! git -C skill-issue ls-files --error-unmatch "$dependency" >/dev/null 2>&1; then
+            echo "Skill Issue has not merged the plugin submodule yet."
+            exit 0
+          fi
+
+          git -C skill-issue submodule update --init "$dependency"
+          git -C "skill-issue/$dependency" fetch origin "$PLUGIN_SHA"
+          git -C "skill-issue/$dependency" checkout --detach "$PLUGIN_SHA"
+
+          if git -C skill-issue diff --quiet -- "$dependency"; then
+            echo "Skill Issue already points at $PLUGIN_SHA."
+            exit 0
+          fi
+
+          (
+            cd skill-issue
+            go test ./...
+          )
+
+          branch="automation/skill-issue-plugin-${PLUGIN_SHA:0:12}"
+          git -C skill-issue checkout -b "$branch"
+          git -C skill-issue config user.name "skill-issue-plugin[bot]"
+          git -C skill-issue config user.email "skill-issue-plugin[bot]@users.noreply.github.com"
+          git -C skill-issue add "$dependency"
+          git -C skill-issue commit -m "chore: update Skill Issue plugin dependency"
+          git -C skill-issue push origin "HEAD:refs/heads/$branch"
